@@ -17,6 +17,9 @@
 package io.confluent.connect.s3;
 
 import com.amazonaws.AmazonClientException;
+import io.confluent.common.config.ConfigException;
+import io.confluent.connect.storage.hive.HiveConfig;
+import io.confluent.connect.storage.schema.StorageSchemaCompatibility;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
@@ -93,6 +96,18 @@ public class S3SinkTask extends SinkTask {
     try {
       connectorConfig = new S3SinkConnectorConfig(props);
       url = connectorConfig.getString(StorageCommonConfig.STORE_URL_CONFIG);
+
+      boolean hiveIntegration = connectorConfig.getBoolean(HiveConfig.HIVE_INTEGRATION_CONFIG);
+      if (hiveIntegration) {
+        StorageSchemaCompatibility compatibility = StorageSchemaCompatibility.getCompatibility(
+                connectorConfig.getString(HiveConfig.SCHEMA_COMPATIBILITY_CONFIG)
+        );
+        if (compatibility == StorageSchemaCompatibility.NONE) {
+          throw new ConfigException(
+                  "Hive Integration requires schema compatibility to be BACKWARD, FORWARD or FULL"
+          );
+        }
+      }
 
       @SuppressWarnings("unchecked")
       Class<? extends S3Storage> storageClass =
